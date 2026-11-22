@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MGSML SKY PROJECT - User Profile</title>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDfN-bzvkvDKH4zFMztm_PZVmRH01gL63Y",
+            authDomain: "mgs-mega-project.firebaseapp.com",
+            projectId: "mgs-mega-project",
+            storageBucket: "mgs-mega-project.firebasestorage.app",
+            messagingSenderId: "802244407572",
+            appId: "1:802244407572:web:05985d2c0dd43763269201"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+    </script>
+
+    <style>
+        :root {
+            --bg-color: #030712;
+            --card-bg: #111827;
+            --card-dark: #090d16;
+            --primary-sky: #38bdf8;
+            --accent-green: #10b981;
+            --gold: #f59e0b;
+            --danger: #ef4444;
+            --text-main: #ffffff;
+            --text-muted: #9ca3af;
+            --border-color: #1f2937;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: radial-gradient(circle at top, #0f172a 0%, #030712 70%);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding-bottom: 36px;
+        }
+
+        .top-header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: 56px;
+            background: rgba(9, 13, 22, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 14px;
+        }
+
+        .header-title {
+            font-size: 14px;
+            font-weight: 900;
+            color: var(--primary-sky);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .header-btn {
+            background: rgba(56, 189, 248, 0.14);
+            color: var(--primary-sky);
+            border: 1px solid var(--primary-sky);
+            border-radius: 8px;
+            padding: 6px 11px;
+            font-size: 11px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 16px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+        }
+
+        .profile-hero {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .avatar-frame {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            border: 3px solid var(--primary-sky);
+            background: var(--card-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            box-shadow: 0 0 22px rgba(56, 189, 248, 0.35);
+        }
+
+        .avatar-frame img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none;
+        }
+
+        .avatar-emoji {
+            font-size: 36px;
+        }
+
+        .full-name {
+            margin: 10px 0 4px 0;
+            font-size: 19px;
+            font-weight: 900;
+            color: #ffffff;
+        }
+
+        .uid-pill {
+            display: inline-block;
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+            border: 1px solid var(--accent-green);
+            padding: 3px 11px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 900;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 14px;
+            width: 100%;
+        }
+
+        .stat-box {
+            background: var(--card-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 11px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .stat-value {
+            margin-top: 4px;
+            font-size: 15px;
+            font-weight: 900;
+            color: var(--gold);
+        }
+
+        .stat-value.green {
+            color: var(--accent-green);
+        }
+
+        .stat-value.sky {
+            color: var(--primary-sky);
+        }
+
+        .section-title {
+            margin: 0 0 10px 0;
+            font-size: 13px;
+            font-weight: 900;
+            color: var(--primary-sky);
+            text-transform: uppercase;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid #1e293b;
+            font-size: 12px;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-key {
+            color: var(--text-muted);
+            font-weight: 700;
+        }
+
+        .info-val {
+            color: #ffffff;
+            font-weight: 800;
+            text-align: right;
+            word-break: break-word;
+        }
+
+        .field-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-top: 8px;
+        }
+
+        .custom-input {
+            width: 100%;
+            padding: 10px 12px;
+            margin: 5px 0 8px 0;
+            background: var(--card-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .btn-green {
+            width: 100%;
+            padding: 11px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 900;
+            cursor: pointer;
+            text-transform: uppercase;
+            margin-top: 6px;
+        }
+
+        .btn-sky {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            background: rgba(56, 189, 248, 0.14);
+            border: 1px solid var(--primary-sky);
+            color: var(--primary-sky);
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            margin-top: 6px;
+        }
+
+        .list-item {
+            background: var(--card-dark);
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+            padding: 9px 11px;
+            margin-bottom: 7px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+        }
+
+        .wallet-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 7px;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+
+        .wallet-chip {
+            background: var(--card-dark);
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+            padding: 8px 10px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        .status-text {
+            margin-top: 8px;
+            font-size: 11px;
+            font-weight: 800;
+            color: var(--accent-green);
+            min-height: 16px;
+        }
+
+        .empty-box {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid var(--gold);
+            color: #fde68a;
+            border-radius: 10px;
+            padding: 14px;
+            font-size: 12px;
+            text-align: center;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="top-header">
+        <button class="header-btn" onclick="goToHeadPage()">← Head Page</button>
+        <div class="header-title">Profile & Network</div>
+        <button class="header-btn" onclick="refreshAllData()">↻ Sync</button>
+    </div>
+
+    <div class="container">
+        <!-- Guest / No Active User Notice -->
+        <div id="no-user-card" class="card" style="display: none;">
+            <div class="empty-box">
+                <p style="margin: 0 0 8px 0; font-weight: 900;">No Active User Session Found</p>
+                <p style="margin: 0 0 12px 0;">Please sign in or sign up from the main Head Page to view your profile, earnings, referrals, and rewards.</p>
+                <button class="btn-green" onclick="goToHeadPage()">Open Head Page</button>
+            </div>
+        </div>
+
+        <!-- Profile Hero & Key Stats -->
+        <div id="hero-card" class="card profile-hero">
+            <div class="avatar-frame">
+                <span id="hero-avatar-emoji" class="avatar-emoji">👤</span>
+                <img id="hero-avatar-img" src="" alt="Profile Photo">
+            </div>
+
+            <h2 id="hero-name" class="full-name">Loading...</h2>
+            <div id="hero-uid" class="uid-pill">ID: ---</div>
+
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Wallet Balance</div>
+                    <div id="stat-wallet-bal" class="stat-value green">0 SKY</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Total Token Earned</div>
+                    <div id="stat-total-earned" class="stat-value sky">0 SKY</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Downline Members</div>
+                    <div id="stat-downline-count" class="stat-value">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Referral Rewards</div>
+                    <div id="stat-referral-rewards" class="stat-value green">0 SKY</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Personal & Contact Details -->
+        <div id="details-card" class="card">
+            <h3 class="section-title">📋 Personal & Contact Information</h3>
+            <div class="info-row"><span class="info-key">Full Name</span><span id="info-name" class="info-val">---</span></div>
+            <div class="info-row"><span class="info-key">User ID</span><span id="info-uid" class="info-val">---</span></div>
+            <div class="info-row"><span class="info-key">Gmail Address</span><span id="info-email" class="info-val">---</span></div>
+            <div class="info-row"><span class="info-key">Mobile Number</span><span id="info-phone" class="info-val">---</span></div>
+            <div class="info-row"><span class="info-key">WhatsApp Number</span><span id="info-whatsapp" class="info-val">---</span></div>
+            <div class="info-row"><span class="info-key">Sponsor ID</span><span id="info-sponsor" class="info-val">---</span></div>
+        </div>
+
+        <!-- Profile Settings (Change Photo, Name & WhatsApp) -->
+        <div id="settings-card" class="card">
+            <h3 class="section-title">⚙️ Profile Settings</h3>
+
+            <label class="field-label">Change Profile Photo</label>
+            <input type="file" id="settings-photo-input" accept="image/*" style="display: none;" onchange="handleSettingsPhotoChange(event)">
+            <button class="btn-sky" onclick="document.getElementById('settings-photo-input').click()">📷 Choose & Change Profile Image</button>
+
+            <label class="field-label">Full Name</label>
+            <input type="text" id="settings-name-input" class="custom-input" placeholder="Enter Full Name">
+
+            <label class="field-label">WhatsApp Number</label>
+            <input type="tel" id="settings-whatsapp-input" class="custom-input" placeholder="Enter WhatsApp Number">
+
+            <button class="btn-green" onclick="saveProfileSettings()">Save Profile Settings</button>
+            <div id="settings-status" class="status-text"></div>
+        </div>
+
+        <!-- Downline & Referral Reward Breakdown -->
+        <div id="network-card" class="card">
+            <h3 class="section-title">🤝 Downline Team & Referral Rewards</h3>
+            <div class="info-row">
+                <span class="info-key">Direct Referrals (Level 1)</span>
+                <span id="net-direct-count" class="info-val">0</span>
+            </div>
+            <div class="info-row">
+                <span class="info-key">Total Team Under User (All Levels)</span>
+                <span id="net-total-downline" class="info-val">0</span>
+            </div>
+            <div class="info-row">
+                <span class="info-key">Active Referral Reward Rate</span>
+                <span id="net-reward-rate" class="info-val">100 SKY</span>
+            </div>
+
+            <div style="margin-top: 10px;" id="referral-breakdown-list">
+                <div style="font-size: 11px; color: var(--text-muted);">Loading referral list...</div>
+            </div>
+        </div>
+
+        <!-- All 20 Ecosystem Tokens -->
+        <div id="wallets-card" class="card">
+            <h3 class="section-title">🪙 Token Wallets & Balances</h3>
+            <div id="wallets-list" class="wallet-grid"></div>
+        </div>
+
+        <button class="btn-sky" onclick="goToHeadPage()">🏠 Back to Main Head Page</button>
+    </div>
+
+    <script>
+        const HEAD_PAGE_URL = "https://mgsml-sky.github.io/Mgsml-Sky/";
+        const globalTokens = [
+            "STAR", "MG", "SCS", "MLF", "MTR", "BULT", "JKR", "MGSML",
+            "BLH", "BRH", "HRM", "DOJI", "SGP", "ULG",
+            "BWD", "SKY", "RKT", "GME", "SSR", "TPY"
+        ];
+
+        let currentUid = "";
+        let currentUser = null;
+        let referralConfig = { token: "SKY", amount: 100 };
+        let directReferrals = [];
+        let totalDownlineCount = 0;
+
+        let unsubUser = null;
+        let unsubCms = null;
+        let unsubDirectRefs = null;
+
+        function resolveUid() {
+            const params = new URLSearchParams(window.location.search);
+            const urlUid = (params.get("uid") || "").trim().toUpperCase();
+            const hashUid = (window.location.hash || "").replace("#", "").trim().toUpperCase();
+            const activeLocal = (localStorage.getItem("mgsml_active_user") || "").trim().toUpperCase();
+            const legacyLocal = (localStorage.getItem("mgsml_user_id") || "").trim().toUpperCase();
+
+            const uid = urlUid || (hashUid.startsWith("MGSML") ? hashUid : "") || activeLocal || legacyLocal;
+            if (uid) {
+                localStorage.setItem("mgsml_active_user", uid);
+            }
+            return uid;
+        }
+
+        function goToHeadPage() {
+            const url = currentUid
+                ? `${HEAD_PAGE_URL}${HEAD_PAGE_URL.includes("?") ? "&" : "?"}uid=${encodeURIComponent(currentUid)}`
+                : HEAD_PAGE_URL;
+            window.location.href = url;
+        }
+
+        function getBalance(data, tokenName) {
+            if (!data) return 0;
+            if (data.wallets && typeof data.wallets === "object") {
+                if (data.wallets[tokenName] !== undefined && data.wallets[tokenName] !== null) {
+                    return Number(data.wallets[tokenName]) || 0;
+                }
+                const key = Object.keys(data.wallets).find(k => k.toUpperCase() === tokenName.toUpperCase());
+                if (key !== undefined) {
+                    return Number(data.wallets[key]) || 0;
+                }
+            }
+            if (tokenName.toUpperCase() === "SKY") {
+                return Number(data.tokenBalance ?? data.skyBalance ?? data.sky ?? 0) || 0;
+            }
+            return Number(data[tokenName.toLowerCase() + "Balance"] ?? data[tokenName] ?? 0) || 0;
+        }
+
+        function renderAvatarImage(src) {
+            const img = document.getElementById("hero-avatar-img");
+            const emoji = document.getElementById("hero-avatar-emoji");
+            if (src && src.trim() !== "") {
+                img.src = src;
+                img.style.display = "block";
+                emoji.style.display = "none";
+            } else {
+                img.src = "";
+                img.style.display = "none";
+                emoji.style.display = "block";
+            }
+        }
+
+        function computeEarningsAndRewards(data) {
+            const activeToken = (data && data.tokenName) ? data.tokenName : "SKY";
+            const walletBal = getBalance(data, activeToken);
+
+            const refToken = referralConfig.token || activeToken;
+            const refRate = Number(referralConfig.amount) || 0;
+            const directCount = directReferrals.length;
+
+            const rewardMap = (data && data.referralRewardsByUser && typeof data.referralRewardsByUser === "object")
+                ? data.referralRewardsByUser
+                : {};
+
+            let totalRefReward = 0;
+            if (Object.keys(rewardMap).length > 0) {
+                Object.values(rewardMap).forEach(val => {
+                    totalRefReward += Number(val) || 0;
+                });
+            } else if (data && data.referralEarned !== undefined) {
+                totalRefReward = Number(data.referralEarned) || 0;
+            } else {
+                totalRefReward = directCount * refRate;
+            }
+
+            let totalEarned = 0;
+            if (data && (data.totalEarned !== undefined || data.earnedTokens !== undefined)) {
+                totalEarned = Number(data.totalEarned ?? data.earnedTokens) || 0;
+            } else {
+                const miningEarned = Number(data && data.miningEarned) || 0;
+                const taskEarned = Number(data && data.taskEarned) || 0;
+                const sumParts = miningEarned + taskEarned + totalRefReward;
+                totalEarned = Math.max(walletBal, sumParts);
+            }
+
+            document.getElementById("stat-wallet-bal").innerText = `${walletBal} ${activeToken}`;
+            document.getElementById("stat-total-earned").innerText = `${totalEarned} ${activeToken}`;
+            document.getElementById("stat-referral-rewards").innerText = `${totalRefReward} ${refToken}`;
+            document.getElementById("net-reward-rate").innerText = `${refRate} ${refToken}`;
+
+            renderReferralList(rewardMap, refToken, refRate);
+        }
+
+        function renderReferralList(rewardMap, refToken, refRate) {
+            const container = document.getElementById("referral-breakdown-list");
+            if (!directReferrals.length) {
+                container.innerHTML = `<div style="font-size: 11px; color: var(--text-muted);">No direct referrals found under ${currentUid}.</div>`;
+                return;
+            }
+
+            container.innerHTML = "";
+            directReferrals.forEach(member => {
+                const mUid = member.userId || member._docId || "---";
+                const mName = member.name || "Member";
+                const earnedFromMember = (rewardMap[mUid] !== undefined)
+                    ? Number(rewardMap[mUid])
+                    : refRate;
+
+                const row = document.createElement("div");
+                row.className = "list-item";
+                row.innerHTML = `
+                    <div>
+                        <b style="color: #ffffff;">${mName}</b><br>
+                        <span style="color: var(--primary-sky);">${mUid}</span>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="color: var(--accent-green); font-weight: 900;">+${earnedFromMember} ${refToken}</span>
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        async function calculateFullDownline(rootUid) {
+            try {
+                const snap = await db.collection("users").get();
+                const childrenBySponsor = {};
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    const sp = (d.sponsor || "").trim().toUpperCase();
+                    if (sp) {
+                        if (!childrenBySponsor[sp]) childrenBySponsor[sp] = [];
+                        childrenBySponsor[sp].push({
+                            ...d,
+                            _docId: doc.id,
+                            userId: (d.userId || doc.id).toUpperCase()
+                        });
+                    }
+                });
+
+                const visited = new Set([rootUid.toUpperCase()]);
+                const queue = [...(childrenBySponsor[rootUid.toUpperCase()] || [])];
+                let count = 0;
+
+                while (queue.length > 0) {
+                    const node = queue.shift();
+                    if (visited.has(node.userId)) continue;
+                    visited.add(node.userId);
+                    count++;
+                    const nextLevel = childrenBySponsor[node.userId] || [];
+                    nextLevel.forEach(child => queue.push(child));
+                }
+
+                totalDownlineCount = count;
+                document.getElementById("stat-downline-count").innerText = totalDownlineCount;
+                document.getElementById("net-total-downline").innerText = totalDownlineCount;
+            } catch (e) {
+                document.getElementById("stat-downline-count").innerText = directReferrals.length;
+                document.getElementById("net-total-downline").innerText = directReferrals.length;
+            }
+        }
+
+        function renderProfile(data) {
+            currentUser = data;
+            const uid = data.userId || currentUid;
+            const fullName = data.name || "MGSML Member";
+            const email = data.email || "Not set";
+            const phone = data.phone || "Not set";
+            const whatsapp = data.whatsapp || data.phone || "Not set";
+            const sponsor = data.sponsorName ? `${data.sponsor} (${data.sponsorName})` : (data.sponsor || "None");
+
+            document.getElementById("no-user-card").style.display = "none";
+            document.getElementById("hero-card").style.display = "flex";
+            document.getElementById("details-card").style.display = "block";
+            document.getElementById("settings-card").style.display = "block";
+            document.getElementById("network-card").style.display = "block";
+            document.getElementById("wallets-card").style.display = "block";
+
+            document.getElementById("hero-name").innerText = fullName;
+            document.getElementById("hero-uid").innerText = `ID: ${uid}`;
+
+            document.getElementById("info-name").innerText = fullName;
+            document.getElementById("info-uid").innerText = uid;
+            document.getElementById("info-email").innerText = email;
+            document.getElementById("info-phone").innerText = phone;
+            document.getElementById("info-whatsapp").innerText = whatsapp;
+            document.getElementById("info-sponsor").innerText = sponsor;
+
+            const nameInp = document.getElementById("settings-name-input");
+            const waInp = document.getElementById("settings-whatsapp-input");
+            if (nameInp && document.activeElement !== nameInp) nameInp.value = fullName;
+            if (waInp && document.activeElement !== waInp) waInp.value = data.whatsapp || "";
+
+            const localPhoto = localStorage.getItem("mgsml_profile_photo_" + uid) || localStorage.getItem("mgsml_profile_photo") || "";
+            renderAvatarImage(data.photoUrl || localPhoto);
+
+            const walletsGrid = document.getElementById("wallets-list");
+            walletsGrid.innerHTML = "";
+            globalTokens.forEach(token => {
+                const bal = getBalance(data, token);
+                const chip = document.createElement("div");
+                chip.className = "wallet-chip";
+                chip.innerHTML = `<span>${token}</span><span style="color: var(--accent-green);">${bal}</span>`;
+                walletsGrid.appendChild(chip);
+            });
+
+            computeEarningsAndRewards(data);
+        }
+
+        function compressImage(file, done) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const maxDim = 260;
+                    let w = img.width;
+                    let h = img.height;
+                    if (w > h && w > maxDim) {
+                        h = Math.round((h * maxDim) / w);
+                        w = maxDim;
+                    } else if (h >= w && h > maxDim) {
+                        w = Math.round((w * maxDim) / h);
+                        h = maxDim;
+                    }
+                    const canvas = document.createElement("canvas");
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext("2d");
+                    ctx.drawImage(img, 0, 0, w, h);
+                    done(canvas.toDataURL("image/jpeg", 0.72));
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleSettingsPhotoChange(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            if (!currentUid) {
+                alert("No active user found.");
+                return;
+            }
+
+            const statusEl = document.getElementById("settings-status");
+            statusEl.style.color = "var(--primary-sky)";
+            statusEl.innerText = "Processing & saving profile image...";
+
+            compressImage(file, async function(dataUrl) {
+                renderAvatarImage(dataUrl);
+                localStorage.setItem("mgsml_profile_photo_" + currentUid, dataUrl);
+                localStorage.setItem("mgsml_profile_photo", dataUrl);
+
+                try {
+                    await db.collection("users").doc(currentUid).set({ photoUrl: dataUrl }, { merge: true });
+                    statusEl.style.color = "var(--accent-green)";
+                    statusEl.innerText = "✔ Profile image updated successfully!";
+                } catch (err) {
+                    statusEl.style.color = "var(--gold)";
+                    statusEl.innerText = "Saved locally; Firestore error: " + err.message;
+                }
+            });
+        }
+
+        async function saveProfileSettings() {
+            if (!currentUid) {
+                alert("No active user found.");
+                return;
+            }
+
+            const newName = (document.getElementById("settings-name-input").value || "").trim();
+            const newWhatsapp = (document.getElementById("settings-whatsapp-input").value || "").trim();
+            const statusEl = document.getElementById("settings-status");
+
+            if (!newName) {
+                statusEl.style.color = "var(--danger)";
+                statusEl.innerText = "Please enter your full name.";
+                return;
+            }
+
+            try {
+                await db.collection("users").doc(currentUid).set({
+                    name: newName,
+                    whatsapp: newWhatsapp
+                }, { merge: true });
+
+                statusEl.style.color = "var(--accent-green)";
+                statusEl.innerText = "✔ Profile settings saved to Firebase!";
+            } catch (err) {
+                statusEl.style.color = "var(--danger)";
+                statusEl.innerText = "Failed to save settings: " + err.message;
+            }
+        }
+
+        function subscribeCms() {
+            if (unsubCms) unsubCms();
+            unsubCms = db.collection("settings").doc("admin_cms").onSnapshot(doc => {
+                if (doc.exists && doc.data().referralConfig) {
+                    referralConfig = {
+                        token: doc.data().referralConfig.token || "SKY",
+                        amount: Number(doc.data().referralConfig.amount) || 0
+                    };
+                }
+                if (currentUser) {
+                    computeEarningsAndRewards(currentUser);
+                }
+            }, () => {});
+        }
+
+        function subscribeReferrals(uid) {
+            if (unsubDirectRefs) unsubDirectRefs();
+            unsubDirectRefs = db.collection("users").where("sponsor", "==", uid).onSnapshot(snap => {
+                directReferrals = [];
+                snap.forEach(d => {
+                    directReferrals.push({ ...d.data(), _docId: d.id });
+                });
+
+                document.getElementById("stat-downline-count").innerText = directReferrals.length;
+                document.getElementById("net-direct-count").innerText = directReferrals.length;
+                document.getElementById("net-total-downline").innerText = directReferrals.length;
+
+                if (currentUser) {
+                    computeEarningsAndRewards(currentUser);
+                }
+                calculateFullDownline(uid);
+            }, () => {});
+        }
+
+        function refreshAllData() {
+            currentUid = resolveUid();
+            if (!currentUid) {
+                document.getElementById("no-user-card").style.display = "block";
+                document.getElementById("hero-card").style.display = "none";
+                document.getElementById("details-card").style.display = "none";
+                document.getElementById("settings-card").style.display = "none";
+                document.getElementById("network-card").style.display = "none";
+                document.getElementById("wallets-card").style.display = "none";
+                return;
+            }
+
+            if (unsubUser) unsubUser();
+            unsubUser = db.collection("users").doc(currentUid).onSnapshot(doc => {
+                if (doc.exists) {
+                    renderProfile(doc.data());
+                } else {
+                    document.getElementById("no-user-card").style.display = "block";
+                    document.getElementById("hero-card").style.display = "none";
+                    document.getElementById("details-card").style.display = "none";
+                    document.getElementById("settings-card").style.display = "none";
+                    document.getElementById("network-card").style.display = "none";
+                    document.getElementById("wallets-card").style.display = "none";
+                }
+            }, err => {
+                console.error("User profile sync error:", err);
+            });
+
+            subscribeReferrals(currentUid);
+        }
+
+        window.addEventListener("DOMContentLoaded", () => {
+            subscribeCms();
+            refreshAllData();
+        });
+    </script>
+</body>
+</html>
