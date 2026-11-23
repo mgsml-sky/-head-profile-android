@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>MGSML SKY PROJECT - Profile & Network</title>
 
     <!-- Firebase SDKs -->
@@ -39,7 +39,7 @@
             --border-color: #1f2937;
         }
 
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         body {
             margin: 0;
@@ -49,6 +49,7 @@
             color: var(--text-main);
             min-height: 100vh;
             padding-bottom: 36px;
+            overflow-x: hidden;
         }
 
         .top-header {
@@ -56,7 +57,7 @@
             top: 0;
             z-index: 100;
             height: 56px;
-            background: rgba(9, 13, 22, 0.95);
+            background: rgba(9, 13, 22, 0.96);
             backdrop-filter: blur(10px);
             border-bottom: 1px solid var(--border-color);
             display: flex;
@@ -427,7 +428,7 @@
 
             <label class="field-label">Change Profile Photo</label>
             <input type="file" id="settings-photo-input" accept="image/*" style="display: none;" onchange="handleSettingsPhotoChange(event)">
-            <button class="btn-sky" onclick="document.getElementById('settings-photo-input').click()">📷 Choose & Change Profile Image</button>
+            <button type="button" class="btn-sky" onclick="triggerProfileImagePicker()">📷 Choose & Change Profile Image</button>
 
             <label class="field-label">Full Name</label>
             <input type="text" id="settings-name-input" class="custom-input" placeholder="Enter Full Name">
@@ -435,7 +436,7 @@
             <label class="field-label">WhatsApp Number</label>
             <input type="tel" id="settings-whatsapp-input" class="custom-input" placeholder="Enter WhatsApp Number">
 
-            <button class="btn-green" onclick="saveProfileSettings()">Save Profile Settings</button>
+            <button type="button" class="btn-green" onclick="saveProfileSettings()">Save Profile Settings</button>
             <div id="settings-status" class="status-text"></div>
         </div>
 
@@ -466,7 +467,7 @@
             <div id="wallets-list" class="wallet-grid"></div>
         </div>
 
-        <button class="btn-sky" onclick="goToHeadPage()">🏠 Back to Main Head Page</button>
+        <button type="button" class="btn-sky" onclick="goToHeadPage()">🏠 Back to Main Head Page</button>
     </div>
 
     <script>
@@ -482,25 +483,82 @@
         let referralConfig = { token: "SKY", amount: 100 };
         let directReferrals = [];
         let totalDownlineCount = 0;
-        let treeRootData = null;
 
         let unsubUser = null;
         let unsubCms = null;
         let unsubUsersCollection = null;
 
-        function normalizeSponsorId(rawSponsor) {
-            let sp = (rawSponsor || "").trim().toUpperCase();
-            if (!sp) return "";
-            if (/^\d+$/.test(sp)) sp = "MGSML" + sp;
-            return sp;
+        // Android / Sketchware Native Bridge Engine
+        const NativeBridge = {
+            isAndroidWebView() {
+                return Boolean(window.Android || window.Sketchware || /wv|Android/i.test(navigator.userAgent));
+            },
+            openImagePicker() {
+                // If custom Android/Sketchware bridge exposes pickProfileImage(), use it; otherwise standard input click
+                try {
+                    if (window.Android && typeof window.Android.pickProfileImage === "function") {
+                        window.Android.pickProfileImage();
+                        return;
+                    }
+                    if (window.Sketchware && typeof window.Sketchware.pickProfileImage === "function") {
+                        window.Sketchware.pickProfileImage();
+                        return;
+                    }
+                } catch (e) {}
+
+                const input = document.getElementById("settings-photo-input");
+                if (input) {
+                    input.value = "";
+                    input.click();
+                }
+            },
+            openUrl(url) {
+                if (!url) return;
+                try {
+                    if (window.Android && typeof window.Android.openUrl === "function") {
+                        window.Android.openUrl(url);
+                        return;
+                    }
+                    window.location.href = url;
+                } catch (e) {
+                    window.location.href = url;
+                }
+            },
+            notifyStatus(msg) {
+                try {
+                    if (window.Android && typeof window.Android.showToast === "function") {
+                        window.Android.showToast(msg);
+                    }
+                } catch (e) {}
+            }
+        };
+
+        // Callback support if Sketchware/Android sends base64 image directly from native picker
+        window.onNativeImageSelected = function(base64OrDataUrl) {
+            if (!base64OrDataUrl) return;
+            const formatted = base64OrDataUrl.startsWith("data:image")
+                ? base64OrDataUrl
+                : "data:image/jpeg;base64," + base64OrDataUrl;
+            persistProfileImage(formatted);
+        };
+
+        function triggerProfileImagePicker() {
+            NativeBridge.openImagePicker();
+        }
+
+        function normalizeUid(raw) {
+            let id = (raw || "").trim().toUpperCase();
+            if (!id) return "";
+            if (/^\d+$/.test(id)) id = "MGSML" + id;
+            return id;
         }
 
         function resolveUid() {
             const params = new URLSearchParams(window.location.search);
-            const urlUid = normalizeSponsorId(params.get("uid") || "");
-            const hashUid = normalizeSponsorId((window.location.hash || "").replace("#", ""));
-            const activeLocal = normalizeSponsorId(localStorage.getItem("mgsml_active_user") || "");
-            const legacyLocal = normalizeSponsorId(localStorage.getItem("mgsml_user_id") || "");
+            const urlUid = normalizeUid(params.get("uid") || "");
+            const hashUid = normalizeUid((window.location.hash || "").replace("#", ""));
+            const activeLocal = normalizeUid(localStorage.getItem("mgsml_active_user") || "");
+            const legacyLocal = normalizeUid(localStorage.getItem("mgsml_user_id") || "");
 
             const uid = urlUid || (hashUid.startsWith("MGSML") ? hashUid : "") || activeLocal || legacyLocal;
             if (uid) {
@@ -513,7 +571,7 @@
             const url = currentUid
                 ? `${HEAD_PAGE_URL}${HEAD_PAGE_URL.includes("?") ? "&" : "?"}uid=${encodeURIComponent(currentUid)}`
                 : HEAD_PAGE_URL;
-            window.location.href = url;
+            NativeBridge.openUrl(url);
         }
 
         function getBalance(data, tokenName) {
@@ -650,16 +708,15 @@
 
         function subscribeNetworkAndTree(rootUid) {
             if (unsubUsersCollection) unsubUsersCollection();
-            const cleanRoot = normalizeSponsorId(rootUid);
+            const cleanRoot = normalizeUid(rootUid);
 
             unsubUsersCollection = db.collection("users").onSnapshot(snap => {
-                const allUsers = [];
                 const childrenBySponsor = {};
 
                 snap.forEach(doc => {
                     const d = doc.data();
-                    const uid = normalizeSponsorId(d.userId || doc.id);
-                    const sponsor = normalizeSponsorId(d.sponsor || "");
+                    const uid = normalizeUid(d.userId || doc.id);
+                    const sponsor = normalizeUid(d.sponsor || "");
                     const node = {
                         ...d,
                         _docId: doc.id,
@@ -667,7 +724,6 @@
                         sponsor: sponsor,
                         children: []
                     };
-                    allUsers.push(node);
 
                     if (sponsor) {
                         if (!childrenBySponsor[sponsor]) childrenBySponsor[sponsor] = [];
@@ -692,7 +748,6 @@
                     return copy;
                 });
 
-                // Count all unique downline members across all levels
                 const visitedCount = new Set([cleanRoot]);
                 const queue = [...(childrenBySponsor[cleanRoot] || [])];
                 let count = 0;
@@ -719,7 +774,7 @@
 
         function renderProfile(data) {
             currentUser = data;
-            const uid = normalizeSponsorId(data.userId || currentUid);
+            const uid = normalizeUid(data.userId || currentUid);
             const fullName = data.name || "MGSML Member";
             const email = data.email || "Not set";
             const phone = data.phone || "Not set";
@@ -791,8 +846,36 @@
             reader.readAsDataURL(file);
         }
 
+        async function persistProfileImage(dataUrl) {
+            if (!currentUid) {
+                alert("No active user found.");
+                return;
+            }
+
+            const statusEl = document.getElementById("settings-status");
+            renderAvatarImage(dataUrl);
+            localStorage.setItem("mgsml_profile_photo_" + currentUid, dataUrl);
+            localStorage.setItem("mgsml_profile_photo", dataUrl);
+
+            statusEl.style.color = "var(--primary-sky)";
+            statusEl.innerText = "Saving profile image to Firebase...";
+
+            try {
+                await db.collection("users").doc(currentUid).set({
+                    photoUrl: dataUrl,
+                    photoUpdatedAt: new Date().toISOString()
+                }, { merge: true });
+                statusEl.style.color = "var(--accent-green)";
+                statusEl.innerText = "✔ Profile image saved permanently to Firebase!";
+                NativeBridge.notifyStatus("Profile image updated");
+            } catch (err) {
+                statusEl.style.color = "var(--gold)";
+                statusEl.innerText = "Saved locally; Firestore error: " + err.message;
+            }
+        }
+
         function handleSettingsPhotoChange(event) {
-            const file = event.target.files[0];
+            const file = event.target.files && event.target.files[0];
             if (!file) return;
             if (!currentUid) {
                 alert("No active user found.");
@@ -801,24 +884,10 @@
 
             const statusEl = document.getElementById("settings-status");
             statusEl.style.color = "var(--primary-sky)";
-            statusEl.innerText = "Processing & saving profile image...";
+            statusEl.innerText = "Processing profile image...";
 
-            compressImage(file, async function(dataUrl) {
-                renderAvatarImage(dataUrl);
-                localStorage.setItem("mgsml_profile_photo_" + currentUid, dataUrl);
-                localStorage.setItem("mgsml_profile_photo", dataUrl);
-
-                try {
-                    await db.collection("users").doc(currentUid).set({
-                        photoUrl: dataUrl,
-                        photoUpdatedAt: new Date().toISOString()
-                    }, { merge: true });
-                    statusEl.style.color = "var(--accent-green)";
-                    statusEl.innerText = "✔ Profile image saved permanently to Firebase!";
-                } catch (err) {
-                    statusEl.style.color = "var(--gold)";
-                    statusEl.innerText = "Saved locally; Firestore error: " + err.message;
-                }
+            compressImage(file, function(dataUrl) {
+                persistProfileImage(dataUrl);
             });
         }
 
@@ -847,6 +916,7 @@
 
                 statusEl.style.color = "var(--accent-green)";
                 statusEl.innerText = "✔ Profile settings saved to Firebase!";
+                NativeBridge.notifyStatus("Profile settings saved");
             } catch (err) {
                 statusEl.style.color = "var(--danger)";
                 statusEl.innerText = "Failed to save settings: " + err.message;
