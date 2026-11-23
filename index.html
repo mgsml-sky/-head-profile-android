@@ -22,6 +22,7 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
         const auth = firebase.auth();
+        db.enablePersistence().catch((err) => console.log("Persistence note:", err.code));
     </script>
 
     <style>
@@ -85,7 +86,7 @@
 
         .container {
             width: 100%;
-            max-width: 500px;
+            max-width: 520px;
             margin: 0 auto;
             padding: 15px;
             display: flex;
@@ -109,8 +110,8 @@
         }
 
         .avatar-frame {
-            width: 90px;
-            height: 90px;
+            width: 92px;
+            height: 92px;
             border-radius: 50%;
             border: 3px solid var(--primary-sky);
             background: var(--card-dark);
@@ -268,17 +269,58 @@
             margin-top: 6px;
         }
 
-        .list-item {
+        /* TREE VIEW STYLES */
+        .tree-container {
+            margin-top: 12px;
             background: var(--card-dark);
             border: 1px solid #1e293b;
+            border-radius: 10px;
+            padding: 12px;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+
+        .tree-root-node {
+            background: rgba(56, 189, 248, 0.14);
+            border: 1px solid var(--primary-sky);
             border-radius: 8px;
-            padding: 9px 11px;
-            margin-bottom: 7px;
+            padding: 8px 10px;
+            font-size: 12px;
+            font-weight: 900;
+            color: var(--primary-sky);
+            margin-bottom: 10px;
+        }
+
+        .tree-branch {
+            margin-left: 14px;
+            padding-left: 12px;
+            border-left: 2px dashed #334155;
+            margin-top: 6px;
+        }
+
+        .tree-node {
+            background: #111827;
+            border: 1px solid #1f2937;
+            border-radius: 8px;
+            padding: 8px 10px;
+            margin-bottom: 6px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             gap: 8px;
             font-size: 11px;
+        }
+
+        .tree-level-badge {
+            display: inline-block;
+            background: rgba(245, 158, 11, 0.16);
+            color: var(--gold);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            border-radius: 6px;
+            padding: 1px 6px;
+            font-size: 9px;
+            font-weight: 900;
+            margin-left: 6px;
         }
 
         .wallet-grid {
@@ -397,9 +439,9 @@
             <div id="settings-status" class="status-text"></div>
         </div>
 
-        <!-- Downline & Referral Reward Breakdown -->
+        <!-- Downline Tree View & Referral Reward Breakdown -->
         <div id="network-card" class="card">
-            <h3 class="section-title">🤝 Downline Team & Referral Rewards</h3>
+            <h3 class="section-title">🌳 Downline Tree View & Referral Rewards</h3>
             <div class="info-row">
                 <span class="info-key">Direct Referrals (Level 1)</span>
                 <span id="net-direct-count" class="info-val">0</span>
@@ -413,8 +455,8 @@
                 <span id="net-reward-rate" class="info-val">100 SKY</span>
             </div>
 
-            <div style="margin-top: 10px;" id="referral-breakdown-list">
-                <div style="font-size: 11px; color: var(--text-muted);">Loading referral list...</div>
+            <div class="tree-container" id="referral-tree-view">
+                <div style="font-size: 11px; color: var(--text-muted);">Loading referral tree...</div>
             </div>
         </div>
 
@@ -440,17 +482,25 @@
         let referralConfig = { token: "SKY", amount: 100 };
         let directReferrals = [];
         let totalDownlineCount = 0;
+        let treeRootData = null;
 
         let unsubUser = null;
         let unsubCms = null;
-        let unsubDirectRefs = null;
+        let unsubUsersCollection = null;
+
+        function normalizeSponsorId(rawSponsor) {
+            let sp = (rawSponsor || "").trim().toUpperCase();
+            if (!sp) return "";
+            if (/^\d+$/.test(sp)) sp = "MGSML" + sp;
+            return sp;
+        }
 
         function resolveUid() {
             const params = new URLSearchParams(window.location.search);
-            const urlUid = (params.get("uid") || "").trim().toUpperCase();
-            const hashUid = (window.location.hash || "").replace("#", "").trim().toUpperCase();
-            const activeLocal = (localStorage.getItem("mgsml_active_user") || "").trim().toUpperCase();
-            const legacyLocal = (localStorage.getItem("mgsml_user_id") || "").trim().toUpperCase();
+            const urlUid = normalizeSponsorId(params.get("uid") || "");
+            const hashUid = normalizeSponsorId((window.location.hash || "").replace("#", ""));
+            const activeLocal = normalizeSponsorId(localStorage.getItem("mgsml_active_user") || "");
+            const legacyLocal = normalizeSponsorId(localStorage.getItem("mgsml_user_id") || "");
 
             const uid = urlUid || (hashUid.startsWith("MGSML") ? hashUid : "") || activeLocal || legacyLocal;
             if (uid) {
@@ -535,81 +585,141 @@
             document.getElementById("stat-referral-rewards").innerText = `${totalRefReward} ${refToken}`;
             document.getElementById("net-reward-rate").innerText = `${refRate} ${refToken}`;
 
-            renderReferralList(rewardMap, refToken, refRate);
+            renderReferralTree(rewardMap, refToken, refRate);
         }
 
-        function renderReferralList(rewardMap, refToken, refRate) {
-            const container = document.getElementById("referral-breakdown-list");
+        function buildTreeHtml(node, level, visited, rewardMap, refToken, refRate) {
+            if (!node || visited.has(node.userId)) return "";
+            visited.add(node.userId);
+
+            const mName = node.name || "Member";
+            const mUid = node.userId;
+            const earnedFromMember = (rewardMap[mUid] !== undefined)
+                ? Number(rewardMap[mUid])
+                : (level === 1 ? refRate : 0);
+
+            const rewardBadge = earnedFromMember > 0
+                ? `<span style="color: var(--accent-green); font-weight: 900;">+${earnedFromMember} ${refToken}</span>`
+                : `<span style="color: var(--text-muted); font-weight: 700;">Level ${level}</span>`;
+
+            let childrenHtml = "";
+            if (node.children && node.children.length > 0) {
+                const branchNodes = node.children
+                    .map(child => buildTreeHtml(child, level + 1, visited, rewardMap, refToken, refRate))
+                    .join("");
+                if (branchNodes) {
+                    childrenHtml = `<div class="tree-branch">${branchNodes}</div>`;
+                }
+            }
+
+            return `
+                <div class="tree-node">
+                    <div>
+                        <b style="color: #ffffff;">${mName}</b>
+                        <span class="tree-level-badge">L${level}</span><br>
+                        <span style="color: var(--primary-sky);">${mUid}</span>
+                    </div>
+                    <div style="text-align: right;">${rewardBadge}</div>
+                </div>
+                ${childrenHtml}
+            `;
+        }
+
+        function renderReferralTree(rewardMap, refToken, refRate) {
+            const container = document.getElementById("referral-tree-view");
+            const rootName = (currentUser && currentUser.name) ? currentUser.name : currentUid;
+
             if (!directReferrals.length) {
-                container.innerHTML = `<div style="font-size: 11px; color: var(--text-muted);">No direct referrals found under ${currentUid}.</div>`;
+                container.innerHTML = `
+                    <div class="tree-root-node">🟢 ${rootName} (${currentUid}) — Root</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">No referrals found under ${currentUid} yet.</div>
+                `;
                 return;
             }
 
-            container.innerHTML = "";
-            directReferrals.forEach(member => {
-                const mUid = member.userId || member._docId || "---";
-                const mName = member.name || "Member";
-                const earnedFromMember = (rewardMap[mUid] !== undefined)
-                    ? Number(rewardMap[mUid])
-                    : refRate;
+            const visited = new Set([currentUid.toUpperCase()]);
+            const branchesHtml = directReferrals
+                .map(member => buildTreeHtml(member, 1, visited, rewardMap, refToken, refRate))
+                .join("");
 
-                const row = document.createElement("div");
-                row.className = "list-item";
-                row.innerHTML = `
-                    <div>
-                        <b style="color: #ffffff;">${mName}</b><br>
-                        <span style="color: var(--primary-sky);">${mUid}</span>
-                    </div>
-                    <div style="text-align: right;">
-                        <span style="color: var(--accent-green); font-weight: 900;">+${earnedFromMember} ${refToken}</span>
-                    </div>
-                `;
-                container.appendChild(row);
-            });
+            container.innerHTML = `
+                <div class="tree-root-node">🟢 ${rootName} (${currentUid}) — Total Team: ${totalDownlineCount}</div>
+                <div class="tree-branch">${branchesHtml}</div>
+            `;
         }
 
-        async function calculateFullDownline(rootUid) {
-            try {
-                const snap = await db.collection("users").get();
+        function subscribeNetworkAndTree(rootUid) {
+            if (unsubUsersCollection) unsubUsersCollection();
+            const cleanRoot = normalizeSponsorId(rootUid);
+
+            unsubUsersCollection = db.collection("users").onSnapshot(snap => {
+                const allUsers = [];
                 const childrenBySponsor = {};
+
                 snap.forEach(doc => {
                     const d = doc.data();
-                    const sp = (d.sponsor || "").trim().toUpperCase();
-                    if (sp) {
-                        if (!childrenBySponsor[sp]) childrenBySponsor[sp] = [];
-                        childrenBySponsor[sp].push({
-                            ...d,
-                            _docId: doc.id,
-                            userId: (d.userId || doc.id).toUpperCase()
-                        });
+                    const uid = normalizeSponsorId(d.userId || doc.id);
+                    const sponsor = normalizeSponsorId(d.sponsor || "");
+                    const node = {
+                        ...d,
+                        _docId: doc.id,
+                        userId: uid,
+                        sponsor: sponsor,
+                        children: []
+                    };
+                    allUsers.push(node);
+
+                    if (sponsor) {
+                        if (!childrenBySponsor[sponsor]) childrenBySponsor[sponsor] = [];
+                        childrenBySponsor[sponsor].push(node);
                     }
                 });
 
-                const visited = new Set([rootUid.toUpperCase()]);
-                const queue = [...(childrenBySponsor[rootUid.toUpperCase()] || [])];
+                function attachChildren(parentNode, seen) {
+                    if (seen.has(parentNode.userId)) return;
+                    seen.add(parentNode.userId);
+                    const kids = childrenBySponsor[parentNode.userId] || [];
+                    parentNode.children = kids.map(k => {
+                        const copy = { ...k, children: [] };
+                        attachChildren(copy, new Set(seen));
+                        return copy;
+                    });
+                }
+
+                directReferrals = (childrenBySponsor[cleanRoot] || []).map(k => {
+                    const copy = { ...k, children: [] };
+                    attachChildren(copy, new Set([cleanRoot]));
+                    return copy;
+                });
+
+                // Count all unique downline members across all levels
+                const visitedCount = new Set([cleanRoot]);
+                const queue = [...(childrenBySponsor[cleanRoot] || [])];
                 let count = 0;
 
                 while (queue.length > 0) {
-                    const node = queue.shift();
-                    if (visited.has(node.userId)) continue;
-                    visited.add(node.userId);
+                    const curr = queue.shift();
+                    if (visitedCount.has(curr.userId)) continue;
+                    visitedCount.add(curr.userId);
                     count++;
-                    const nextLevel = childrenBySponsor[node.userId] || [];
-                    nextLevel.forEach(child => queue.push(child));
+                    const nextKids = childrenBySponsor[curr.userId] || [];
+                    nextKids.forEach(nk => queue.push(nk));
                 }
 
                 totalDownlineCount = count;
                 document.getElementById("stat-downline-count").innerText = totalDownlineCount;
+                document.getElementById("net-direct-count").innerText = directReferrals.length;
                 document.getElementById("net-total-downline").innerText = totalDownlineCount;
-            } catch (e) {
-                document.getElementById("stat-downline-count").innerText = directReferrals.length;
-                document.getElementById("net-total-downline").innerText = directReferrals.length;
-            }
+
+                if (currentUser) {
+                    computeEarningsAndRewards(currentUser);
+                }
+            }, () => {});
         }
 
         function renderProfile(data) {
             currentUser = data;
-            const uid = data.userId || currentUid;
+            const uid = normalizeSponsorId(data.userId || currentUid);
             const fullName = data.name || "MGSML Member";
             const email = data.email || "Not set";
             const phone = data.phone || "Not set";
@@ -699,9 +809,12 @@
                 localStorage.setItem("mgsml_profile_photo", dataUrl);
 
                 try {
-                    await db.collection("users").doc(currentUid).set({ photoUrl: dataUrl }, { merge: true });
+                    await db.collection("users").doc(currentUid).set({
+                        photoUrl: dataUrl,
+                        photoUpdatedAt: new Date().toISOString()
+                    }, { merge: true });
                     statusEl.style.color = "var(--accent-green)";
-                    statusEl.innerText = "✔ Profile image updated successfully!";
+                    statusEl.innerText = "✔ Profile image saved permanently to Firebase!";
                 } catch (err) {
                     statusEl.style.color = "var(--gold)";
                     statusEl.innerText = "Saved locally; Firestore error: " + err.message;
@@ -728,7 +841,8 @@
             try {
                 await db.collection("users").doc(currentUid).set({
                     name: newName,
-                    whatsapp: newWhatsapp
+                    whatsapp: newWhatsapp,
+                    updatedAt: new Date().toISOString()
                 }, { merge: true });
 
                 statusEl.style.color = "var(--accent-green)";
@@ -742,34 +856,23 @@
         function subscribeCms() {
             if (unsubCms) unsubCms();
             unsubCms = db.collection("settings").doc("admin_cms").onSnapshot(doc => {
-                if (doc.exists && doc.data().referralConfig) {
-                    referralConfig = {
-                        token: doc.data().referralConfig.token || "SKY",
-                        amount: Number(doc.data().referralConfig.amount) || 0
-                    };
+                if (doc.exists) {
+                    const d = doc.data();
+                    if (d.referralConfig) {
+                        referralConfig = {
+                            token: d.referralConfig.token || "SKY",
+                            amount: Number(d.referralConfig.amount) || 0
+                        };
+                    } else if (d.tokensConfig) {
+                        referralConfig = {
+                            token: d.tokensConfig.selectedToken || "SKY",
+                            amount: Number(d.tokensConfig.tokenAmount) || 0
+                        };
+                    }
                 }
                 if (currentUser) {
                     computeEarningsAndRewards(currentUser);
                 }
-            }, () => {});
-        }
-
-        function subscribeReferrals(uid) {
-            if (unsubDirectRefs) unsubDirectRefs();
-            unsubDirectRefs = db.collection("users").where("sponsor", "==", uid).onSnapshot(snap => {
-                directReferrals = [];
-                snap.forEach(d => {
-                    directReferrals.push({ ...d.data(), _docId: d.id });
-                });
-
-                document.getElementById("stat-downline-count").innerText = directReferrals.length;
-                document.getElementById("net-direct-count").innerText = directReferrals.length;
-                document.getElementById("net-total-downline").innerText = directReferrals.length;
-
-                if (currentUser) {
-                    computeEarningsAndRewards(currentUser);
-                }
-                calculateFullDownline(uid);
             }, () => {});
         }
 
@@ -801,7 +904,7 @@
                 console.error("User profile sync error:", err);
             });
 
-            subscribeReferrals(currentUid);
+            subscribeNetworkAndTree(currentUid);
         }
 
         window.addEventListener("DOMContentLoaded", () => {
